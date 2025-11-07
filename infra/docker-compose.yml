@@ -1,0 +1,35 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    container_name: email-rabbitmq
+    ports:
+      - "5672:5672"     # RabbitMQ 메시징 포트
+      - "15672:15672"   # 관리자 대시보드 포트
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+    networks:
+      - email-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: email-mysql
+    restart: always
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: email_scheduler
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - email-network
+
+networks:
+  email-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
