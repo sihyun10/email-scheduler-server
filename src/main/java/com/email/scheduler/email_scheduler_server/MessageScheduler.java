@@ -1,4 +1,4 @@
-package com.email.scheduler;
+package com.email.scheduler.email_scheduler_server;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
