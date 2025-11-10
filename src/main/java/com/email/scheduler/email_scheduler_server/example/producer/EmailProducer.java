@@ -1,7 +1,6 @@
 package com.email.scheduler.email_scheduler_server.example.producer;
 
 import static com.email.scheduler.email_scheduler_server.example.config.RabbitMQConfig.EXCHANGE_NAME;
-import static com.email.scheduler.email_scheduler_server.example.config.RabbitMQConfig.ROUTING_KEY;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +16,6 @@ public class EmailProducer {
 
     public void sendMessage(String message) {
         log.info("[Producer] 메시지 전송 중: {}", message);
-        rabbitTemplate.convertAndSend(EXCHANGE_NAME, ROUTING_KEY, message);
+        rabbitTemplate.convertAndSend(EXCHANGE_NAME, "", message);
     }
 }

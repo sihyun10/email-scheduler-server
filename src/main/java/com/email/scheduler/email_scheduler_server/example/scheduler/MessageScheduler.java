@@ -15,7 +15,7 @@ public class MessageScheduler {
 
     @Scheduled(fixedRate = 10000)
     public void sendEmailMessage() {
-        String message = "[스케줄러] 이메일 발송 요청 📨";
+        String message = "[스케줄러] 이메일 발송 요청";
         log.info("[스케줄러] 메시지 생성: {}", message);
         emailProducer.sendMessage(message);
     }
