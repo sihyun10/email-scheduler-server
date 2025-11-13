@@ -12,11 +12,22 @@ import org.springframework.stereotype.Component;
 public class NewsletterScheduler {
 
     private final NewsletterPublisher publisher;
+    private boolean allNewslettersSent = false;
 
     @Scheduled(fixedRate = 10000)
     public void sendDailyNewsletter() {
+        if (allNewslettersSent) {
+            return;
+        }
+
         log.info("⏰ [Scheduler] 뉴스레터 발송 시작");
-        publisher.publishNewsletter();
-        log.info("☑️ [Scheduler] 뉴스레터 발송 완료");
+        boolean hasMore = publisher.publishNewsletter();
+
+        if (!hasMore) {
+            allNewslettersSent = true;
+            log.info("[Scheduler] 모든 뉴스레터 발송 완료. 스케줄러 중지");
+        } else {
+            log.info("[Scheduler] 뉴스레터 발송 완료");
+        }
     }
 }

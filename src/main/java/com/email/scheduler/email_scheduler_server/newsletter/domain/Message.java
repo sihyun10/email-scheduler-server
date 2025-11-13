@@ -35,6 +35,8 @@ public class Message {
     @Lob
     private String content;
 
+    private String fileName;
+
     private LocalDateTime sendAt;
 
     @Enumerated(EnumType.STRING)
