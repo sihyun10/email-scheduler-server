@@ -1,5 +1,7 @@
 package com.email.scheduler.email_scheduler_server.newsletter.consumer;
 
+import static com.email.scheduler.email_scheduler_server.newsletter.config.RabbitMQConfig.QUEUE_NAME;
+
 import com.email.scheduler.email_scheduler_server.newsletter.domain.Message;
 import com.email.scheduler.email_scheduler_server.newsletter.domain.Message.MessageStatus;
 import com.email.scheduler.email_scheduler_server.newsletter.domain.NewsletterMessage;
@@ -24,7 +26,7 @@ public class NewsletterConsumer {
     private final MessageRepository messageRepository;
     private final EmailService emailService;
 
-    @RabbitListener(queues = "newsletter.queue")
+    @RabbitListener(queues = QUEUE_NAME)
     @Transactional
     public void receiveMessage(NewsletterMessage message) {
         log.info("[Consumer] Received newsletter content. Preparing to send to subscribers.");
