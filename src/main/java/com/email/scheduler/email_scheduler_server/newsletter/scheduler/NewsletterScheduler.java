@@ -13,7 +13,8 @@ public class NewsletterScheduler {
 
     private final NewsletterPublisher publisher;
 
-    @Scheduled(fixedRate = 10000)
+    // @Scheduled(fixedRate = 10000) // 테스트용 스케줄러 : 개발/테스트 시 빠르게 확인하기 위해 사용 (10초 간격)
+    @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
     public void sendDailyNewsletter() {
         boolean hasNewsletter = publisher.publishNewsletter();
 
