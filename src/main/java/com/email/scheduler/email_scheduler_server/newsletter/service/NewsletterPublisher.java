@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ NewsletterPublisher {
             List<String> newsletterFiles = loadNewsletterFiles();
             String nextFileName = determineNextNewsletterFile(newsletterFiles);
             if (nextFileName == null) {
-                log.info("모든 뉴스레터를 전송 완료했습니다. 스케줄러를 중지합니다.");
+                log.info("모든 뉴스레터를 전송 완료했습니다.");
                 return false;
             }
 
@@ -63,16 +64,23 @@ NewsletterPublisher {
     }
 
     private String determineNextNewsletterFile(List<String> newsletterFiles) {
-        return messageRepository.findLastSentFileName()
-                .map(lastSent -> {
-                    int currentIndex = newsletterFiles.indexOf(lastSent);
-                    int nextIndex = currentIndex + 1;
-                    if (nextIndex >= newsletterFiles.size()) {
-                        return null;
-                    }
-                    return newsletterFiles.get(nextIndex);
-                })
-                .orElse(newsletterFiles.getFirst()); // 첫 실행 시 첫 번째 뉴스레터 발송
+        Optional<String> lastSentOpt = messageRepository.findLastSentFileName();
+
+        if (lastSentOpt.isEmpty()) {
+            // 첫 실행 시 첫 번째 뉴스레터 발송
+            return newsletterFiles.get(0);
+        }
+
+        String lastSent = lastSentOpt.get();
+        int currentIndex = newsletterFiles.indexOf(lastSent);
+
+        int nextIndex = currentIndex + 1;
+
+        if (nextIndex >= newsletterFiles.size()) {
+            return null;
+        }
+
+        return newsletterFiles.get(nextIndex);
     }
 
     private int extractNumber(String fileName) {

@@ -8,6 +8,7 @@ import com.email.scheduler.email_scheduler_server.newsletter.repository.MessageR
 import com.email.scheduler.email_scheduler_server.newsletter.repository.SubscriberRepository;
 import com.email.scheduler.email_scheduler_server.newsletter.service.EmailService;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -31,16 +32,20 @@ public class NewsletterConsumer {
         String fileName = message.getFileName();
         String content = message.getContent();
 
-        subscriberRepository.findAllByActiveTrue()
+        List<Subscriber> subscribers = subscriberRepository.findAllByActiveTrue();
+
+        // 병렬 처리로 동시 발송
+        subscribers.parallelStream()
                 .forEach(subscriber -> processEmail(subscriber, content, fileName));
 
-        log.info("[Consumer] Finished sending newsletters to all subscribers.");
+        log.info("[Consumer] Finished sending newsletters to all {} subscribers.", subscribers.size());
     }
 
     private void processEmail(Subscriber subscriber, String content, String fileName) {
         try {
             boolean success = emailService.sendEmail(subscriber.getEmail(), content);
             saveMessageLog(subscriber, content, fileName, success);
+            log.info("[Consumer] Email sent to {}: {}", subscriber.getEmail(), success ? "SUCCESS" : "FAILURE");
         } catch (Exception e) {
             log.error("[Consumer] Failed to send email to {}", subscriber.getEmail(), e);
             saveMessageLog(subscriber, content, fileName, false);
