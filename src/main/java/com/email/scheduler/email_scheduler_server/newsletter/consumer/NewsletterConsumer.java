@@ -112,18 +112,17 @@ public class NewsletterConsumer {
     ) {
         List<Message> logs = Collections.synchronizedList(new ArrayList<>(subscribers.size()));
 
-        subscribers.parallelStream()
-                .forEach(subscriber -> {
-                    boolean success = sendEmailSafely(subscriber, message.getContent());
+        for (Subscriber subscriber : subscribers) {
+            boolean success = sendEmailSafely(subscriber, message.getContent());
 
-                    logs.add(buildLog(subscriber, message, success));
+            logs.add(buildLog(subscriber, message, success));
 
-                    if (success) {
-                        successCount.incrementAndGet();
-                    } else {
-                        failCount.incrementAndGet();
-                    }
-                });
+            if (success) {
+                successCount.incrementAndGet();
+            } else {
+                failCount.incrementAndGet();
+            }
+        }
 
         return logs;
     }
