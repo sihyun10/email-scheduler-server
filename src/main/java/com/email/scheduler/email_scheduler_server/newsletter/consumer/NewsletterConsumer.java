@@ -17,6 +17,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,9 @@ public class NewsletterConsumer {
     private final MessageRepository messageRepository;
     private final EmailService emailService;
 
+    // 한 번에 처리할 구독자 수 (10,000명)
+    private static final int PAGE_SIZE = 10_000;
+
     @RabbitListener(queues = QUEUE_NAME)
     @Transactional
     public void receiveMessage(NewsletterMessage message) {
@@ -38,64 +44,78 @@ public class NewsletterConsumer {
         String fileName = message.getFileName();
         String content = message.getContent();
 
-        List<Subscriber> subscribers = subscriberRepository.findAllByActiveTrue();
-        log.info("[Consumer] 👥 총 구독자 수: {}", subscribers.size());
-
-        long queryTime = System.currentTimeMillis();
-        log.info("[Consumer] ⏱️ 구독자 조회 시간: {}ms", queryTime - startTime);
+        long totalSubscribers = subscriberRepository.count();
+        log.info("[Consumer] 👥 총 구독자 수: {}", totalSubscribers);
 
         // 성공과 실패 카운터
         final AtomicInteger successCount = new AtomicInteger(0);
         final AtomicInteger failCount = new AtomicInteger(0);
 
-        // 1. 병렬 처리 중 로그 객체를 안전하게 모으기 위한 동기화된 리스트 생성
-        List<Message> messageLogs = Collections.synchronizedList(new ArrayList<>(subscribers.size()));
+        int pageNumber = 0;
+        boolean hasNext = true;
 
-        // 병렬 처리로 동시 발송
-        subscribers.parallelStream()
-                .forEach(subscriber -> {
-                    boolean success = false;
-                    try {
-                        // 2. 이메일 발송
-                        success = emailService.sendEmail(subscriber.getEmail(), content);
-                    } catch (Exception e) {
-                        log.error("[Consumer] Failed to send email to {}", subscriber.getEmail(), e);
-                    }
+        long queryTime = System.currentTimeMillis();
 
-                    // 3. DB 저장을 위해 로그 객체만 생성하여 리스트에 추가
-                    Message log = Message.builder()
-                            .subscriber(subscriber)
-                            .content(content)
-                            .fileName(fileName)
-                            .sendAt(LocalDateTime.now())
-                            .status(success ? MessageStatus.SUCCESS : MessageStatus.FAILURE)
-                            .build();
+        // 1. Paging Loop 시작 : 구독자를 PAGE_SIZE 단위로 조회/처리
+        while (hasNext) {
+            Pageable pageable = PageRequest.of(pageNumber, PAGE_SIZE);
+            Page<Subscriber> subscriberPage = subscriberRepository.findAllByActiveTrue(pageable);
 
-                    messageLogs.add(log);
+            List<Subscriber> currentSubscribers = subscriberPage.getContent();
 
-                    if (success) {
-                        successCount.incrementAndGet();
-                    } else {
-                        failCount.incrementAndGet();
-                    }
-                });
+            if (currentSubscribers.isEmpty()) {
+                break;
+            }
 
-        // 4. 병렬 스트림이 완료된 후, 트랜잭션 내에서 한 번에 벌크 삽입
-        long batchStartTime = System.currentTimeMillis();
-        messageRepository.saveAll(messageLogs);
-        long batchEndTime = System.currentTimeMillis();
-        log.info("[Consumer] DB Batch Insert 시간: {}ms", batchEndTime - batchStartTime);
+            // 현재 페이지 로그 객체를 담을 동기화된 리스트
+            List<Message> messageLogs = Collections.synchronizedList(new ArrayList<>(currentSubscribers.size()));
+
+            // 2. 페이지별 병렬 처리
+            currentSubscribers.parallelStream()
+                    .forEach(subscriber -> {
+                        boolean success = false;
+                        try {
+                            success = emailService.sendEmail(subscriber.getEmail(), content);
+                        } catch (Exception e) {
+                            log.error("[Consumer] Failed to send email to {}", subscriber.getEmail(), e);
+                        }
+
+                        // 로그 객체 생성
+                        Message log = Message.builder()
+                                .subscriber(subscriber)
+                                .content(content)
+                                .fileName(fileName)
+                                .sendAt(LocalDateTime.now())
+                                .status(success ? MessageStatus.SUCCESS : MessageStatus.FAILURE)
+                                .build();
+
+                        messageLogs.add(log);
+
+                        if (success) {
+                            successCount.incrementAndGet();
+                        } else {
+                            failCount.incrementAndGet();
+                        }
+                    });
+
+            // 3. 페이지별 Batch Insert
+            messageRepository.saveAll(messageLogs);
+
+            // 다음 페이지로 이동
+            pageNumber += 1;
+            hasNext = subscriberPage.hasNext();
+        }
 
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
-        long finalEmailTime = endTime - queryTime; // 이메일 발송 + 배치 시간
 
-        log.info("[Consumer] ✅ 발송 완료 - 총 시간: {}ms, 이메일 발송+배치 시간: {}ms", totalTime, finalEmailTime);
-        double avgTime = (double) finalEmailTime / subscribers.size();
-        log.info("[Consumer] 📈 평균 발송 속도: {}ms/구독자", String.format("%.2f", avgTime));
+        log.info("[Consumer] ⏱️ 구독자 조회 시작 시간: {}ms", queryTime - startTime);
+        log.info("[Consumer] ✅ 발송 완료 - 총 시간: {}ms", totalTime);
+        double avgTime = (double) totalTime / totalSubscribers;
+        log.info("[Consumer] 📈 평균 처리 속도: {}ms/구독자", String.format("%.2f", avgTime));
         log.info("[Consumer] 🔮 성공: {} FAIL: {} (성공률: {}%)",
                 successCount.get(),
                 failCount.get(),
-                String.format("%.1f", (double) successCount.get() / subscribers.size() * 100));
+                String.format("%.1f", (double) successCount.get() / totalSubscribers * 100));
     }
 }
