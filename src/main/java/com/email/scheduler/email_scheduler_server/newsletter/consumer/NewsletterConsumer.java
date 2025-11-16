@@ -6,9 +6,9 @@ import com.email.scheduler.email_scheduler_server.newsletter.domain.Message;
 import com.email.scheduler.email_scheduler_server.newsletter.domain.Message.MessageStatus;
 import com.email.scheduler.email_scheduler_server.newsletter.domain.NewsletterMessage;
 import com.email.scheduler.email_scheduler_server.newsletter.domain.Subscriber;
-import com.email.scheduler.email_scheduler_server.newsletter.repository.MessageRepository;
 import com.email.scheduler.email_scheduler_server.newsletter.repository.SubscriberRepository;
 import com.email.scheduler.email_scheduler_server.newsletter.service.EmailService;
+import com.email.scheduler.email_scheduler_server.newsletter.service.MessageLogService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,7 +21,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -29,14 +28,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class NewsletterConsumer {
 
     private final SubscriberRepository subscriberRepository;
-    private final MessageRepository messageRepository;
+    private final MessageLogService messageLogService;
     private final EmailService emailService;
 
     // 한 번에 처리할 구독자 수 (10,000명)
     private static final int PAGE_SIZE = 10_000;
 
     @RabbitListener(queues = QUEUE_NAME)
-    @Transactional
     public void receiveMessage(NewsletterMessage message) {
         long startTime = System.currentTimeMillis();
         log.info("[Consumer] 📨 뉴스레터 발송 시작 - 파일: {}", message.getFileName());
@@ -99,7 +97,7 @@ public class NewsletterConsumer {
                     });
 
             // 3. 페이지별 Batch Insert
-            messageRepository.saveAll(messageLogs);
+            messageLogService.saveLogsInBatch(messageLogs);
 
             // 다음 페이지로 이동
             pageNumber += 1;
