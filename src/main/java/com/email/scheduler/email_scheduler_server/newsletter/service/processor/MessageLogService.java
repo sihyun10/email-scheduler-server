@@ -1,4 +1,4 @@
-package com.email.scheduler.email_scheduler_server.newsletter.service;
+package com.email.scheduler.email_scheduler_server.newsletter.service.processor;
 
 import com.email.scheduler.email_scheduler_server.newsletter.domain.Message;
 import com.email.scheduler.email_scheduler_server.newsletter.repository.MessageRepository;
