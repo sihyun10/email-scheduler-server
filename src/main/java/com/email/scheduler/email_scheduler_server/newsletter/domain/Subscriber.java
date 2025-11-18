@@ -38,4 +38,8 @@ public class Subscriber {
         this.email = email;
         this.active = true; // Default to active for new subscriptions
     }
+
+    public void activate() {
+        this.active = true;
+    }
 }

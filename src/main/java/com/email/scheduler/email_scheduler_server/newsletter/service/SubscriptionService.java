@@ -16,10 +16,17 @@ public class SubscriptionService {
 
     @Transactional
     public Subscriber subscribe(String email) {
-        Optional<Subscriber> existingSubscriber = subscriberRepository.findByEmail(email);
+        Optional<Subscriber> optionalSubscriber = subscriberRepository.findByEmail(email);
 
-        if (existingSubscriber.isPresent()) {
-            return existingSubscriber.get();
+        if (optionalSubscriber.isPresent()) {
+            Subscriber subscriber = optionalSubscriber.get();
+
+            if (!subscriber.isActive()) {
+                subscriber.activate();
+                return subscriberRepository.save(subscriber);
+            }
+            
+            return subscriber;
         } else {
             try {
                 Subscriber newSubscriber = new Subscriber(email);
