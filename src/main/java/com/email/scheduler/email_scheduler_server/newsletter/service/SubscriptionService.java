@@ -19,24 +19,9 @@ public class SubscriptionService {
         Optional<Subscriber> optionalSubscriber = subscriberRepository.findByEmail(email);
 
         if (optionalSubscriber.isPresent()) {
-            Subscriber subscriber = optionalSubscriber.get();
-
-            if (!subscriber.isActive()) {
-                subscriber.activate();
-                return subscriberRepository.save(subscriber);
-            }
-            
-            return subscriber;
+            return reactivateIfInactive(optionalSubscriber.get());
         } else {
-            try {
-                Subscriber newSubscriber = new Subscriber(email);
-                return subscriberRepository.save(newSubscriber);
-            } catch (DataIntegrityViolationException e) {
-                // 동시성 이슈로 다른 트랜잭션이 먼저 커밋한 경우, 다시 한번 이메일 조회
-                return subscriberRepository.findByEmail(email)
-                        .orElseThrow(() -> new IllegalStateException(
-                                "동시성 충돌 이후 이메일로 구독자를 찾지 못했습니다. email= " + email));
-            }
+            return createNewSubscriber(email);
         }
     }
 
@@ -48,5 +33,28 @@ public class SubscriptionService {
                 subscriberRepository.save(subscriber);
             }
         });
+    }
+
+    // 이미 존재하는 구독자 처리
+    // 비활성 상태 ➔ 활성화하고 저장, 활성 상태 ➔ 그대로 반환
+    private Subscriber reactivateIfInactive(Subscriber subscriber) {
+        if (!subscriber.isActive()) {
+            subscriber.activate();
+            return subscriberRepository.save(subscriber);
+        }
+
+        return subscriber;
+    }
+
+    // 신규 구독자 생성하고, 동시성 충돌 시 재조회하여 처리
+    private Subscriber createNewSubscriber(String email) {
+        try {
+            Subscriber newSubscriber = new Subscriber(email);
+            return subscriberRepository.save(newSubscriber);
+        } catch (DataIntegrityViolationException e) {
+            return subscriberRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "동시성 충돌 이후 이메일로 구독자를 찾지 못했습니다. email= " + email));
+        }
     }
 }
