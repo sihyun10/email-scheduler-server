@@ -39,4 +39,14 @@ public class SubscriptionService {
             }
         }
     }
+
+    @Transactional
+    public void unsubscribe(String email) {
+        subscriberRepository.findByEmail(email).ifPresent(subscriber -> {
+            if (subscriber.isActive()) {
+                subscriber.deactivate();
+                subscriberRepository.save(subscriber);
+            }
+        });
+    }
 }
